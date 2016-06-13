@@ -4,10 +4,13 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
+import com.google.inject.Provider;
 import com.google.inject.persist.PersistFilter;
 import com.google.inject.persist.jpa.JpaPersistModule;
 import com.google.inject.servlet.GuiceServletContextListener;
 import com.google.inject.servlet.ServletModule;
+
+import javax.persistence.EntityManager;
 
 // https://groups.google.com/forum/#!topic/google-guice/OMxfc1PCKvw
 // https://groups.google.com/forum/#!topic/google-guice/2VK-bdsnjZc/discussion
@@ -28,6 +31,7 @@ public class MyGuiceServletConfig extends GuiceServletContextListener {
 
             serve("/master").with(MasterServlet.class);
             serve("/slave").with(SlaveServlet.class);
+            serve("/slave2").with(SlaveServlet2.class);
 
 //            serve("/no").with(NoAnnotationServlet.class);
         }
@@ -62,6 +66,10 @@ public class MyGuiceServletConfig extends GuiceServletContextListener {
 
             bind(KEY).to(PersistFilter.class);
             expose(KEY);
+
+            final Provider<EntityManager> entityManagerProvider = binder().getProvider(EntityManager.class);
+            bind(EntityManager.class).annotatedWith(UseSlave.class).toProvider(entityManagerProvider);
+            expose(EntityManager.class).annotatedWith(UseSlave.class);
         }
     }
 }
