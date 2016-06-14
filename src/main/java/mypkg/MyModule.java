@@ -34,7 +34,7 @@ public class MyModule extends AbstractModule {
             bind(UnitOfWork.class).annotatedWith(MasterDatabase.class).toProvider(binder().getProvider(UnitOfWork.class));
             expose(UnitOfWork.class).annotatedWith(MasterDatabase.class);
 
-            // service classes that use EntityManager or @Transactional must be bind explicitly here
+            // service classes that use EntityManager or @Transactional must be bound explicitly here
             //
             // http://stackoverflow.com/questions/8486437/guice-beginner-how-to-bind-concrete-classes
             bind(MyService.class);
