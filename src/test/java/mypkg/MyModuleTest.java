@@ -1,12 +1,19 @@
 package mypkg;
 
+import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
+import com.google.inject.Provides;
+import com.google.inject.persist.PersistService;
+import com.google.inject.persist.UnitOfWork;
+import com.google.inject.util.Modules;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -57,15 +64,20 @@ public class MyModuleTest {
     @Before
     public void setUp() throws Exception {
         injector = Guice.createInjector(new MyModule());
+        injector.getInstance(Key.get(PersistService.class, MasterDatabase.class)).start();
+        injector.getInstance(Key.get(PersistService.class, SlaveDatabase.class)).start();
+        injector.getInstance(Key.get(UnitOfWork.class, MasterDatabase.class)).begin();
+        injector.getInstance(Key.get(UnitOfWork.class, SlaveDatabase.class)).begin();
     }
 
     private Injector injector;
 
     @Test
     public void masterShouldBeInjectedWhenNoAnnotationSupplied() {
-        final EntityManager em = injector.getInstance(EntityManager.class);
+        final EntityManager em = injector.getInstance(Key.get(EntityManager.class, MasterDatabase.class));
 
         assertThat(em.getProperties().get("javax.persistence.jdbc.url"), is("jdbc:derby:memory:masterDB;create=true"));
+        assertThat(injector.getInstance(MyService.class).getMycol(), is("master"));
     }
 
     @Test
@@ -73,5 +85,12 @@ public class MyModuleTest {
         final EntityManager em = injector.getInstance(Key.get(EntityManager.class, SlaveDatabase.class));
 
         assertThat(em.getProperties().get("javax.persistence.jdbc.url"), is("jdbc:derby:memory:slaveDB;create=true"));
+        assertThat(injector.getInstance(MyService.class).getMycol(), is("master"));
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        injector.getInstance(Key.get(UnitOfWork.class, MasterDatabase.class)).end();
+        injector.getInstance(Key.get(UnitOfWork.class, SlaveDatabase.class)).end();
     }
 }
