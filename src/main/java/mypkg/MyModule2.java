@@ -13,7 +13,7 @@ import javax.persistence.EntityManager;
 
 // https://groups.google.com/forum/#!topic/google-guice/OMxfc1PCKvw
 // https://groups.google.com/forum/#!topic/google-guice/2VK-bdsnjZc/discussion
-public class MyModule extends AbstractModule {
+public class MyModule2 extends AbstractModule {
 
     @Override
     protected void configure() {
@@ -37,11 +37,11 @@ public class MyModule extends AbstractModule {
             expose(UnitOfWork.class).annotatedWith(MasterDatabase.class);
 
             // service classes that use EntityManager or @Transactional must be bound explicitly here
-            //
-            // http://stackoverflow.com/questions/8486437/guice-beginner-how-to-bind-concrete-classes
+            bind(FooService.class).annotatedWith(MasterDatabase.class).to(FooService.class);
+            expose(FooService.class).annotatedWith(MasterDatabase.class);
 
-            bind(FooService.class);
-            expose(FooService.class);
+            bind(BarService.class).annotatedWith(MasterDatabase.class).to(BarService.class);
+            expose(BarService.class).annotatedWith(MasterDatabase.class);
         }
     }
 
@@ -60,8 +60,12 @@ public class MyModule extends AbstractModule {
             bind(UnitOfWork.class).annotatedWith(SlaveDatabase.class).toProvider(binder().getProvider(UnitOfWork.class));
             expose(UnitOfWork.class).annotatedWith(SlaveDatabase.class);
 
-            bind(BarService.class);
-            expose(BarService.class);
+            // services
+            bind(FooService.class).annotatedWith(SlaveDatabase.class).to(FooService.class);
+            expose(FooService.class).annotatedWith(SlaveDatabase.class);
+
+            bind(BarService.class).annotatedWith(SlaveDatabase.class).to(BarService.class);
+            expose(BarService.class).annotatedWith(SlaveDatabase.class);
         }
     }
 }

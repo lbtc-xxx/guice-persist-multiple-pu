@@ -5,9 +5,9 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.persist.PersistService;
 import com.google.inject.persist.UnitOfWork;
-import nestedservice.BarService;
-import nestedservice.BazService;
-import nestedservice.FooService;
+import nestedservice.MasterBazService;
+import nestedservice.SlaveBazService;
+import nestedservice.TransactionalBazService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -24,7 +24,7 @@ import java.util.Arrays;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
-public class MyModuleTest {
+public class MyModule3Test {
 
     @BeforeClass
     public static void initClass() throws Exception {
@@ -62,7 +62,7 @@ public class MyModuleTest {
 
     @Before
     public void setUp() throws Exception {
-        injector = Guice.createInjector(new MyModule());
+        injector = Guice.createInjector(new MyModule3());
         injector.getInstance(Key.get(PersistService.class, MasterDatabase.class)).start();
         injector.getInstance(Key.get(PersistService.class, SlaveDatabase.class)).start();
         injector.getInstance(Key.get(UnitOfWork.class, MasterDatabase.class)).begin();
@@ -72,42 +72,13 @@ public class MyModuleTest {
     private Injector injector;
 
     @Test
-    public void masterShouldBeInjectedWhenNoAnnotationSupplied() {
+    public void transactionalBazServiceUsesMaster() throws Exception {
+        final TransactionalBazService sut = injector.getInstance(TransactionalBazService.class);
+
+        sut.save();
+
         final EntityManager em = injector.getInstance(Key.get(EntityManager.class, MasterDatabase.class));
-
-        assertThat(em.getProperties().get("javax.persistence.jdbc.url"), is("jdbc:derby:memory:masterDB;create=true"));
-    }
-
-    @Test
-    public void slaveShouldBeInjectedWhenSlaveDatabaseAnnotationSupplied() {
-        final EntityManager em = injector.getInstance(Key.get(EntityManager.class, SlaveDatabase.class));
-
-        assertThat(em.getProperties().get("javax.persistence.jdbc.url"), is("jdbc:derby:memory:slaveDB;create=true"));
-    }
-
-    @Test
-    public void fooServiceUsesMaster() throws Exception {
-        final String actual = injector.getInstance(FooService.class).find();
-
-        assertThat(actual, is("master"));
-    }
-
-    @Test
-    public void barServiceUsesSlave() throws Exception {
-        final String actual = injector.getInstance(BarService.class).find();
-
-        assertThat(actual, is("slave"));
-    }
-
-    @Test
-    public void bazServiceUsesBoth() throws Exception {
-        final BazService sut = injector.getInstance(BazService.class);
-
-        final String foo = sut.findViaFoo();
-        final String bar = sut.findViaBar();
-
-        assertThat(foo, is("master"));
-        assertThat(bar, is("slave"));
+        assertThat(em.createNamedQuery("MyTable.findAll", MyTable.class).getResultList().size(), is(3));
     }
 
     @After
