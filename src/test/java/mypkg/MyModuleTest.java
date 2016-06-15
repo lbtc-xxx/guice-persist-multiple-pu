@@ -5,9 +5,10 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.persist.PersistService;
 import com.google.inject.persist.UnitOfWork;
+import nestedservice.AlwaysSlaveService;
 import nestedservice.BarService;
-import nestedservice.BazService;
 import nestedservice.FooService;
+import nestedservice.BazService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -72,42 +73,46 @@ public class MyModuleTest {
     private Injector injector;
 
     @Test
-    public void masterShouldBeInjectedWhenNoAnnotationSupplied() {
-        final EntityManager em = injector.getInstance(Key.get(EntityManager.class, MasterDatabase.class));
+    public void alwaysSlaveServiceUsesSlaveDatabase() {
+        final AlwaysSlaveService sut = injector.getInstance(AlwaysSlaveService.class);
 
-        assertThat(em.getProperties().get("javax.persistence.jdbc.url"), is("jdbc:derby:memory:masterDB;create=true"));
-    }
-
-    @Test
-    public void slaveShouldBeInjectedWhenSlaveDatabaseAnnotationSupplied() {
-        final EntityManager em = injector.getInstance(Key.get(EntityManager.class, SlaveDatabase.class));
-
-        assertThat(em.getProperties().get("javax.persistence.jdbc.url"), is("jdbc:derby:memory:slaveDB;create=true"));
-    }
-
-    @Test
-    public void fooServiceUsesMaster() throws Exception {
-        final String actual = injector.getInstance(FooService.class).find();
-
-        assertThat(actual, is("master"));
-    }
-
-    @Test
-    public void barServiceUsesSlave() throws Exception {
-        final String actual = injector.getInstance(BarService.class).find();
+        final String actual = sut.find();
 
         assertThat(actual, is("slave"));
     }
 
     @Test
-    public void bazServiceUsesBoth() throws Exception {
+    public void barServiceUsesDistinctDatabase() {
+        final BarService masterSut = injector.getInstance(Key.get(BarService.class, MasterDatabase.class));
+        final BarService slaveSut = injector.getInstance(Key.get(BarService.class, SlaveDatabase.class));
+
+        final String masterActual = masterSut.find();
+        final String slaveActual = slaveSut.find();
+
+        assertThat(masterActual, is("master"));
+        assertThat(slaveActual, is("slave"));
+    }
+
+    @Test
+    public void fooServiceUsesDistinctDatabase() {
+        final FooService masterSut = injector.getInstance(Key.get(FooService.class, MasterDatabase.class));
+        final FooService slaveSut = injector.getInstance(Key.get(FooService.class, SlaveDatabase.class));
+
+        final String masterActual = masterSut.find();
+        final String slaveActual = slaveSut.find();
+
+        assertThat(masterActual, is("master"));
+        assertThat(slaveActual, is("slave"));
+    }
+
+    @Test
+    public void bazServiceUsesMasterDatabase() {
         final BazService sut = injector.getInstance(BazService.class);
 
-        final String foo = sut.findViaFoo();
-        final String bar = sut.findViaBar();
+        sut.save();
 
-        assertThat(foo, is("master"));
-        assertThat(bar, is("slave"));
+        assertThat(injector.getInstance(Key.get(EntityManager.class, MasterDatabase.class)).createQuery("select count(e) from MyTable e", Long.class).getSingleResult(), is(3L));
+        assertThat(injector.getInstance(Key.get(EntityManager.class, SlaveDatabase.class)).createQuery("select count(e) from MyTable e", Long.class).getSingleResult(), is(1L));
     }
 
     @After
