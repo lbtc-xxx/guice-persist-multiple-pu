@@ -7,8 +7,8 @@ import com.google.inject.persist.PersistService;
 import com.google.inject.persist.UnitOfWork;
 import nestedservice.AlwaysSlaveService;
 import nestedservice.BarService;
-import nestedservice.FooService;
 import nestedservice.BazService;
+import nestedservice.FooService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -26,22 +26,18 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 public class MyModuleTest {
+    private static final String MASTER_URL = "jdbc:derby:memory:masterDB;create=true";
+    private static final String SLAVE_URL = "jdbc:derby:memory:slaveDB;create=true";
 
     @BeforeClass
     public static void initClass() throws Exception {
-        populateDatabase();
+        createSchema();
     }
 
-    private static void populateDatabase() throws SQLException {
-        final String master = "jdbc:derby:memory:masterDB;create=true";
-        final String slave = "jdbc:derby:memory:slaveDB;create=true";
-
-        for (final String url : Arrays.asList(master, slave)) {
+    private static void createSchema() throws SQLException {
+        for (final String url : Arrays.asList(MASTER_URL, SLAVE_URL)) {
             createTable(url);
         }
-
-        insert(master, "master");
-        insert(slave, "slave");
     }
 
     private static void createTable(final String url) throws SQLException {
@@ -52,7 +48,12 @@ public class MyModuleTest {
         }
     }
 
-    private static void insert(final String url, final String value) throws SQLException {
+    private static void cleanInsert(final String url, final String value) throws SQLException {
+        try (final Connection cn = DriverManager.getConnection(url);
+             final Statement st = cn.createStatement()) {
+            st.executeUpdate("delete from mytable");
+        }
+
         final String sql = "insert into mytable (mycol) values (?)";
         try (final Connection cn = DriverManager.getConnection(url);
              final PreparedStatement ps = cn.prepareStatement(sql)) {
@@ -63,6 +64,9 @@ public class MyModuleTest {
 
     @Before
     public void setUp() throws Exception {
+        cleanInsert(MASTER_URL, "master");
+        cleanInsert(SLAVE_URL, "slave");
+
         injector = Guice.createInjector(new MyModule());
         injector.getInstance(Key.get(PersistService.class, MasterDatabase.class)).start();
         injector.getInstance(Key.get(PersistService.class, SlaveDatabase.class)).start();
